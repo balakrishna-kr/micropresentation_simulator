@@ -244,7 +244,9 @@ export function useSpeechSynthesis() {
 
           utterance.onend = handleFinish;
           utterance.onerror = (e) => {
-            console.warn("TTS utterance warning:", e);
+            if (e.error !== "canceled" && e.error !== "interrupted") {
+              console.warn("TTS utterance warning:", e.error || e);
+            }
             handleFinish();
           };
 

@@ -879,12 +879,19 @@ export function useInterviewStateMachine({
     addAiLog("Interview aborted by candidate", "warn");
   }, [mediaRecorder, speechSynthesis, addAiLog, visionTracking]);
 
+  const visionTrackingRef = useRef(visionTracking);
   useEffect(() => {
+    visionTrackingRef.current = visionTracking;
+  }, [visionTracking]);
+
+  // Cleanup on true component unmount ONLY
+  useEffect(() => {
+    abortRef.current = false;
     return () => {
       abortRef.current = true;
-      visionTracking.stopTracking();
+      visionTrackingRef.current?.stopTracking?.();
     };
-  }, [visionTracking]);
+  }, []);
 
   return {
     step,

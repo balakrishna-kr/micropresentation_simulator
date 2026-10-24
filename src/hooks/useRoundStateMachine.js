@@ -169,7 +169,7 @@ export function useRoundStateMachine({
     setStatusMessage("Prepare your presentation — organize your thoughts");
     addAiLog(`Preparation phase: assigned topic "${topicTitle}"`, "info");
 
-    startCountdown(config.prepTime || 60, () => {
+    startCountdown(config?.prepTime || 60, () => {
       actionsRef.current.startPresentation?.();
     });
 
@@ -517,14 +517,25 @@ export function useRoundStateMachine({
     addAiLog("Session aborted by candidate", "warn");
   }, [clearTimer, mediaRecorder, speechSynthesis, addAiLog, visionTracking]);
 
-  // Cleanup on unmount
+  const visionTrackingRef = useRef(visionTracking);
   useEffect(() => {
+    visionTrackingRef.current = visionTracking;
+  }, [visionTracking]);
+
+  const clearTimerRef = useRef(clearTimer);
+  useEffect(() => {
+    clearTimerRef.current = clearTimer;
+  }, [clearTimer]);
+
+  // Cleanup on true component unmount ONLY
+  useEffect(() => {
+    abortRef.current = false;
     return () => {
       abortRef.current = true;
-      clearTimer();
-      visionTracking.stopTracking();
+      clearTimerRef.current?.();
+      visionTrackingRef.current?.stopTracking?.();
     };
-  }, [clearTimer, visionTracking]);
+  }, []);
 
   return {
     phase,
