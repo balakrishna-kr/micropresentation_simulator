@@ -21,6 +21,7 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
+    currentExpression,
     confirmIntroduction,
     confirmAnswer,
     skipPreparation,
