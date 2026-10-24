@@ -175,6 +175,55 @@ export function useVisionTracking() {
     };
   };
 
+  const startTracking = useCallback((videoElement) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    intervalRef.current = setInterval(() => {
+      if (
+        !videoElement ||
+        videoElement.paused ||
+        videoElement.readyState < 2
+      )
+        return;
+
+      try {
+        let expression = "Neutral";
+        let lookingAway = false;
+        let handsMoving = false;
+
+        // Draw video frame to canvas with explicit dimensions
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+        const timestamp = performance.now();
+
+        if (faceLandmarkerRef.current) {
+          const faceResult = faceLandmarkerRef.current.detectForVideo(
+            canvas,
+            timestamp
+          );
+          expression = classifyExpression(faceResult.faceBlendshapes);
+          lookingAway = detectLookingAway(faceResult.faceLandmarks);
+          setCurrentExpression(expression);
+        }
+
+        // Lightweight pixel-diff for movement
+        handsMoving = detectMovementByPixelDiff(canvas);
+
+        analyticsLogRef.current.push({
+          timestamp: Date.now(),
+          expression: expression.replace(/^[^\s]+\s/, ""), // Remove emoji
+          handsMoving,
+          lookingAway,
+        });
+      } catch (e) {
+        // Silently continue on detection errors
+      }
+    }, 2000);
+  }, []);
+
   /**
    * Initialize MediaPipe FaceLandmarker
    */
@@ -230,56 +279,7 @@ export function useVisionTracking() {
       // We restore only on stopTracking
       videoRef.current._restoreConsole = restoreConsole;
     }
-  }, []);
-
-  const startTracking = (videoElement) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
-    intervalRef.current = setInterval(() => {
-      if (
-        !videoElement ||
-        videoElement.paused ||
-        videoElement.readyState < 2
-      )
-        return;
-
-      try {
-        let expression = "Neutral";
-        let lookingAway = false;
-        let handsMoving = false;
-
-        // Draw video frame to canvas with explicit dimensions
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-        const timestamp = performance.now();
-
-        if (faceLandmarkerRef.current) {
-          const faceResult = faceLandmarkerRef.current.detectForVideo(
-            canvas,
-            timestamp
-          );
-          expression = classifyExpression(faceResult.faceBlendshapes);
-          lookingAway = detectLookingAway(faceResult.faceLandmarks);
-          setCurrentExpression(expression);
-        }
-
-        // Lightweight pixel-diff for movement
-        handsMoving = detectMovementByPixelDiff(canvas);
-
-        analyticsLogRef.current.push({
-          timestamp: Date.now(),
-          expression: expression.replace(/^[^\s]+\s/, ""), // Remove emoji
-          handsMoving,
-          lookingAway,
-        });
-      } catch (e) {
-        // Silently continue on detection errors
-      }
-    }, 2000);
-  };
+  }, [startTracking]);
 
   const stopTracking = useCallback(() => {
     if (intervalRef.current) {
@@ -305,6 +305,35 @@ export function useVisionTracking() {
     return [...analyticsLogRef.current];
   }, []);
 
+  const getTelemetrySummary = useCallback(() => {
+    const log = analyticsLogRef.current;
+    if (!log || log.length === 0) return null;
+
+    const total = log.length;
+    const eyeContactCount = log.filter((e) => !e.lookingAway).length;
+    const eyeContactPercent = Math.round((eyeContactCount / total) * 100);
+
+    const expressionsCount = {};
+    log.forEach((e) => {
+      expressionsCount[e.expression] = (expressionsCount[e.expression] || 0) + 1;
+    });
+
+    const handsMovingCount = log.filter((e) => e.handsMoving).length;
+    const handsMovingPercent = Math.round((handsMovingCount / total) * 100);
+
+    const sortedExpressions = Object.entries(expressionsCount).sort((a, b) => b[1] - a[1]);
+    const dominantExpression = sortedExpressions[0]?.[0] || "Neutral";
+
+    return {
+      sampleCount: total,
+      eyeContactPercent,
+      handsMovingPercent,
+      dominantExpression,
+      frequentLookingAway: eyeContactPercent < 60,
+      expressionsBreakdown: expressionsCount,
+    };
+  }, []);
+
   const clearLog = useCallback(() => {
     analyticsLogRef.current = [];
     prevFrameRef.current = null;
@@ -314,6 +343,7 @@ export function useVisionTracking() {
     initTracking,
     stopTracking,
     getAnalyticsLog,
+    getTelemetrySummary,
     clearLog,
     currentExpression,
     isLoading,

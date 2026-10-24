@@ -13,53 +13,73 @@ export function normalizeTextForSpeech(text) {
   clean = clean.replace(/```[\s\S]*?```/g, "");
   clean = clean.replace(/`([^`]+)`/g, "$1");
 
-  // 2. Remove markdown formatting (headers, bold, italics, links)
+  // 2. Remove markdown formatting (headers, bold, italics, links, blockquotes)
   clean = clean.replace(/#{1,6}\s+/g, "");
   clean = clean.replace(/\*\*(.*?)\*\*/g, "$1");
   clean = clean.replace(/\*(.*?)\*/g, "$1");
   clean = clean.replace(/__(.*?)__/g, "$1");
   clean = clean.replace(/_(.*?)_/g, "$1");
   clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  clean = clean.replace(/^>\s*/gm, "");
 
-  // 3. Fix "AI" pronunciation:
-  // Browser TTS often pronounces "A.I." as "A dot I" or pauses unnaturally.
-  // Replacing with "A I " (with space, no periods) forces the engine to pronounce the letters clearly.
-  clean = clean.replace(/\bA\.I\.\b/gi, "A I");
-  clean = clean.replace(/\bAI\b/g, "A I");
-  clean = clean.replace(/\bAI-/gi, "A I ");
-  clean = clean.replace(/\ba\.i\b/gi, "A I");
+  // 3. Foolproof phonetic replacement for "AI" -> "Ay-Eye":
+  // Browser TTS voices often pronounce "AI" as the word "I" (/aɪ/) or pause unnaturally at "A.I.".
+  // "Ay-Eye" forces all TTS engines (Google, Microsoft, Apple) to pronounce the distinct letters "A" and "I".
+  clean = clean.replace(/(?<=\b|[_\-])(?:A\.I\.|AI|a\.i\.|ai)(?=\b|[_\-])/g, "Ay-Eye");
+  clean = clean.replace(/\bAy-Eye-powered\b/gi, "Ay-Eye powered");
+  clean = clean.replace(/\bAy-Eye\s+model\b/gi, "Ay-Eye model");
 
-  // 4. Fix "Q and A" / "Q&A" pronunciation (prevent saying "qna" or stuttering):
+  // 4. Latin & Common Shorthands (handles dots, brackets, commas, trailing spaces):
+  // e.g. / e.g / eg. / (e.g., ...) -> "for example, "
+  clean = clean.replace(/(^|[\s(])e\.?g\.?(?:[,:.]|\b)\s*/gi, "$1for example, ");
+  // i.e. / i.e / ie. / (i.e., ...) -> "that is, "
+  clean = clean.replace(/(^|[\s(])i\.?e\.?(?:[,:.]|\b)\s*/gi, "$1that is, ");
+  // etc. / etc -> "et cetera "
+  clean = clean.replace(/(^|[\s(])etc\.?(?:[,:.]|\b)\s*/gi, "$1et cetera ");
+  // vs / vs. / v. -> "versus "
+  clean = clean.replace(/(^|[\s(])vs?\.?\s+/gi, "$1versus ");
+  // w/o -> without, w/ -> with
+  clean = clean.replace(/\bw\/o\b/gi, "without");
+  clean = clean.replace(/\bw\/(?=\s)/gi, "with ");
+  // approx -> approximately
+  clean = clean.replace(/\bapprox\.?\s*/gi, "approximately ");
+
+  // 5. Expand Q&A and question labels:
   clean = clean.replace(/\bQ\s*&\s*A\b/gi, "Questions and Answers");
   clean = clean.replace(/\bQ\s+and\s+A\b/gi, "Questions and Answers");
   clean = clean.replace(/\bQNA\b/gi, "Questions and Answers");
-  clean = clean.replace(/\bQ\s+and\s+a\b/g, "Questions and Answers");
+  clean = clean.replace(/\bQ(\d+):?\s*/gi, "Question $1: ");
+  clean = clean.replace(/\bA(\d+):?\s*/gi, "Answer $1: ");
 
-  // 5. Fix Question & Answer bullet labels:
-  clean = clean.replace(/\bQ(\d+):?/gi, "Question $1: ");
-  clean = clean.replace(/\bA(\d+):?/gi, "Answer $1: ");
+  // 6. Fix Scores (format: "SCORE: 8/10" or "8/10" -> "8 out of 10")
+  clean = clean.replace(/(?:SCORE|Score|score):\s*(\d+(?:\.\d+)?)\s*\/\s*10/gi, "Final Score: $1 out of 10.");
+  clean = clean.replace(/(\d+(?:\.\d+)?)\s*\/\s*10\b/g, "$1 out of 10");
 
-  // 6. Fix Scores (format: "SCORE: 8/10" -> "Final score: 8 out of 10.")
-  clean = clean.replace(/SCORE:\s*(\d+(?:\.\d+)?)\s*\/\s*10/gi, "Final Score: $1 out of 10.");
-
-  // 7. Fix standard academic & common abbreviations:
+  // 7. Academic and technical abbreviations:
   clean = clean.replace(/\bBBA\b/g, "B B A");
   clean = clean.replace(/\bB\.?Com\b/gi, "B Com");
+  clean = clean.replace(/\bMBA\b/g, "M B A");
+  clean = clean.replace(/\bECA\b/g, "extracurricular activities");
+  clean = clean.replace(/\bWPM\b/g, "words per minute");
   clean = clean.replace(/\b10th\b/gi, "tenth");
   clean = clean.replace(/\b12th\b/gi, "twelfth");
-  clean = clean.replace(/\bECA\b/g, "extracurricular activities");
-  clean = clean.replace(/\be\.g\.,?\b/gi, "for example");
-  clean = clean.replace(/\bi\.e\.,?\b/gi, "that is");
-  clean = clean.replace(/\betc\.\b/gi, "etcetera");
-  clean = clean.replace(/\bvs\.?\b/gi, "versus");
-  clean = clean.replace(/\bw\/o\b/gi, "without");
+  clean = clean.replace(/\b1st\b/gi, "first");
+  clean = clean.replace(/\b2nd\b/gi, "second");
+  clean = clean.replace(/\b3rd\b/gi, "third");
 
-  // 8. Strip bullets, excessive hyphens, dashes, and special characters that TTS stumbles on
-  clean = clean.replace(/^[\s\-\*•]+\s*/gm, "");
+  // 8. Symbols: &, %, +, #
+  clean = clean.replace(/\s*&\s*/g, " and ");
+  clean = clean.replace(/(\d+)\s*%/g, "$1 percent");
+  clean = clean.replace(/\s*\+\s*/g, " plus ");
+  clean = clean.replace(/No\.\s*(\d+)/gi, "Number $1");
+
+  // 9. Strip bullets, excessive hyphens, dashes, and stray characters
+  clean = clean.replace(/^[\s\-\*•·]+\s*/gm, "");
   clean = clean.replace(/[—–]/g, ", ");
   clean = clean.replace(/[\#\~\|\_]/g, "");
+  clean = clean.replace(/\.{2,}/g, ", ");
 
-  // 9. Normalize spacing
+  // 10. Normalize spacing
   clean = clean.replace(/\s+/g, " ");
 
   return clean.trim();
