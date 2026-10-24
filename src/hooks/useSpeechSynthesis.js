@@ -182,8 +182,11 @@ export function useSpeechSynthesis() {
           return;
         }
 
-        // Cancel any active speech
+        // Cancel any active speech and ensure synth is not paused
         window.speechSynthesis.cancel();
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
 
         // Apply pronunciation normalization
         const cleanText = normalizeTextForSpeech(text);
@@ -199,12 +202,15 @@ export function useSpeechSynthesis() {
         const speakNext = () => {
           if (chunkIndex >= chunks.length) {
             setIsSpeaking(false);
+            if (typeof window !== "undefined") {
+              window._activeUtterance = null;
+            }
             resolve();
             return;
           }
 
-          const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex]);
-          // Slightly deliberate, confident pace for executive clarity
+          const chunk = chunks[chunkIndex];
+          const utterance = new SpeechSynthesisUtterance(chunk);
           utterance.rate = 0.98;
           utterance.pitch = 1.0;
           utterance.volume = 1.0;
@@ -213,18 +219,41 @@ export function useSpeechSynthesis() {
             utterance.voice = voice;
           }
 
-          utterance.onend = () => {
-            chunkIndex++;
-            speakNext();
+          // Safety watchdog timeout (estimated word duration + 3s buffer)
+          const wordCount = chunk.split(/\s+/).filter(Boolean).length;
+          const maxWaitMs = Math.max(wordCount * 800, 3500);
+          let hasFinished = false;
+
+          const watchdogTimer = setTimeout(() => {
+            if (!hasFinished) {
+              hasFinished = true;
+              console.warn("TTS watchdog timer triggered for chunk:", chunkIndex);
+              chunkIndex++;
+              speakNext();
+            }
+          }, maxWaitMs);
+
+          const handleFinish = () => {
+            if (!hasFinished) {
+              hasFinished = true;
+              clearTimeout(watchdogTimer);
+              chunkIndex++;
+              speakNext();
+            }
           };
 
+          utterance.onend = handleFinish;
           utterance.onerror = (e) => {
             console.warn("TTS utterance warning:", e);
-            chunkIndex++;
-            speakNext();
+            handleFinish();
           };
 
+          // Protect from Chrome garbage collection
           utteranceRef.current = utterance;
+          if (typeof window !== "undefined") {
+            window._activeUtterance = utterance;
+          }
+
           window.speechSynthesis.speak(utterance);
         };
 

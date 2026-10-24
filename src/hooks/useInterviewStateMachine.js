@@ -125,16 +125,9 @@ export function useInterviewStateMachine({
   const startIntroduction = useCallback(async () => {
     if (abortRef.current) return;
     setStep(INTERVIEW_STEPS.INTRODUCTION);
-    setStatusMessage("AI is speaking...");
+    setStatusMessage("Your turn — introduce yourself into the microphone");
     setLatestTranscript("");
     addAiLog("Starting Personal Interview: Step 1 Introduction", "info");
-
-    await aiSpeak(
-      "Welcome to your personal interview session. I will be your interviewer today. Please introduce yourself briefly — your name, where you are from, and a little about your background. When you are finished, click the Continue button."
-    );
-
-    if (abortRef.current) return;
-    setStatusMessage("Your turn — introduce yourself into the microphone");
 
     const videoEl = getVideoElement ? getVideoElement() : null;
     if (videoEl) {
@@ -143,11 +136,27 @@ export function useInterviewStateMachine({
       addAiLog("Google MediaPipe on-device FaceLandmarker tracking active", "success");
       addAiLog("Webcam video frame capture activated (480p sampling)", "info");
     }
-    await mediaRecorder.startRecording();
+
+    try {
+      await mediaRecorder.startRecording();
+    } catch (err) {
+      console.error("Recording start error:", err);
+    }
+
+    // Make button immediately visible so candidate can proceed when ready
     setWaitingForUser(true);
+
+    try {
+      await aiSpeak(
+        "Welcome to your personal interview session. I will be your interviewer today. Please introduce yourself briefly — your name, where you are from, and a little about your background. When you are finished, click the Continue button."
+      );
+    } catch (err) {
+      console.warn("Speech playback error:", err);
+    }
   }, [aiSpeak, mediaRecorder, getVideoElement, addAiLog, visionTracking]);
 
   const confirmIntroduction = useCallback(async () => {
+    speechSynthesis.cancel();
     setWaitingForUser(false);
     const response = await recordAndTranscribe();
 
@@ -161,7 +170,7 @@ export function useInterviewStateMachine({
 
     introductionRef.current = response || "Candidate introduced themselves.";
     actionsRef.current.startDataReview?.();
-  }, [recordAndTranscribe, detectRepeatIntent, aiSpeak, mediaRecorder, addAiLog]);
+  }, [recordAndTranscribe, detectRepeatIntent, aiSpeak, mediaRecorder, addAiLog, speechSynthesis]);
 
   // ─── STEP 2: DATA REVIEW (auto-advance) ────────
   const startDataReview = useCallback(async () => {

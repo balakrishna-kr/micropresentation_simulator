@@ -102,16 +102,9 @@ export function useRoundStateMachine({
   const startGreeting = useCallback(async () => {
     if (abortRef.current) return;
     setPhase(PHASES.GREETING);
-    setStatusMessage("AI is speaking...");
+    setStatusMessage("Your turn — introduce yourself into the microphone");
     setLatestTranscript("");
     addAiLog("Starting assessment: Candidate greeting & introduction", "info");
-
-    await speechSynthesis.speak(
-      "Welcome to your AI Micro-Presentation assessment. Please introduce yourself briefly. When you are finished, click the Continue button."
-    );
-
-    if (abortRef.current) return;
-    setStatusMessage("Your turn — introduce yourself into the microphone");
 
     const videoEl = getVideoElement ? getVideoElement() : null;
     if (videoEl) {
@@ -120,13 +113,29 @@ export function useRoundStateMachine({
       addAiLog("Google MediaPipe on-device FaceLandmarker tracking active", "success");
       addAiLog("Webcam video frame capture activated (480p sampling)", "info");
     }
-    await mediaRecorder.startRecording();
-    addAiLog("MediaRecorder started: capturing audio stream", "info");
+
+    try {
+      await mediaRecorder.startRecording();
+      addAiLog("MediaRecorder started: capturing audio stream", "info");
+    } catch (err) {
+      console.error("Recording start error:", err);
+    }
+
+    // Make Continue button immediately available so user is never blocked
     setWaitingForUser(true);
+
+    try {
+      await speechSynthesis.speak(
+        "Welcome to your AI Micro-Presentation assessment. Please introduce yourself briefly. When you are finished, click the Continue button."
+      );
+    } catch (err) {
+      console.warn("Speech playback error:", err);
+    }
   }, [speechSynthesis, mediaRecorder, getVideoElement, addAiLog, visionTracking]);
 
   // User clicks "Continue" after introduction
   const confirmIntroduction = useCallback(async () => {
+    speechSynthesis.cancel();
     setWaitingForUser(false);
     setIsTranscribing(true);
     setStatusMessage("Transcribing your introduction with Whisper AI...");
@@ -150,7 +159,7 @@ export function useRoundStateMachine({
 
     if (abortRef.current) return;
     actionsRef.current.startPreparation?.();
-  }, [mediaRecorder, addAiLog]);
+  }, [mediaRecorder, addAiLog, speechSynthesis]);
 
   // ─── PHASE 2: PREPARATION ──────────────────────────
   const startPreparation = useCallback(async () => {
