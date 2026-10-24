@@ -1,16 +1,14 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import ModuleSelector from "@/components/service/ModuleSelector";
 import ConfigPanel from "@/components/service/ConfigPanel";
 import ActiveRound from "@/components/service/ActiveRound";
 import InterviewConfigPanel from "@/components/interview/InterviewConfigPanel";
 import ActiveInterview from "@/components/interview/ActiveInterview";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { useVisionTracking } from "@/hooks/useVisionTracking";
 import { useRoundStateMachine } from "@/hooks/useRoundStateMachine";
 import { useInterviewStateMachine } from "@/hooks/useInterviewStateMachine";
-import { PHASES } from "@/lib/constants";
 
 export default function ServicePage() {
   // null = module selector, "presentation" = existing flow, "interview" = new flow
@@ -18,90 +16,112 @@ export default function ServicePage() {
   const [isActive, setIsActive] = useState(false);
   const [config, setConfig] = useState(null);
 
-  const speechRecognition = useSpeechRecognition();
+  const mediaRecorder = useMediaRecorder();
   const speechSynthesis = useSpeechSynthesis();
-  const visionTracking = useVisionTracking();
 
-  // ─── Existing Presentation State Machine ─────────
+  // Helper to obtain current active video element for frame capture
+  const getVideoElement = useCallback(() => {
+    if (typeof document === "undefined") return null;
+    const video = document.querySelector("#camera-feed video");
+    return video;
+  }, []);
+
+  // ─── Presentation State Machine ───────────────────
   const handlePresentationComplete = useCallback(() => {
-    visionTracking.stopTracking();
-    visionTracking.clearLog();
-    speechRecognition.stop();
-    speechRecognition.resetTranscript();
+    mediaRecorder.stopPeriodicFrameCapture();
+    mediaRecorder.stopStream();
     speechSynthesis.cancel();
     setIsActive(false);
     setConfig(null);
-  }, [visionTracking, speechRecognition, speechSynthesis]);
+  }, [mediaRecorder, speechSynthesis]);
 
   const presentationStateMachine = useRoundStateMachine({
-    speechRecognition,
+    mediaRecorder,
     speechSynthesis,
-    visionTracking,
     config: config || { prepTime: 60, presentTime: 60, topic: { title: "" } },
     onComplete: handlePresentationComplete,
+    getVideoElement,
   });
 
-  // ─── New Interview State Machine ─────────────────
+  // ─── Interview State Machine ─────────────────────
   const handleInterviewComplete = useCallback(() => {
-    visionTracking.stopTracking();
-    visionTracking.clearLog();
-    speechRecognition.stop();
-    speechRecognition.resetTranscript();
+    mediaRecorder.stopPeriodicFrameCapture();
+    mediaRecorder.stopStream();
     speechSynthesis.cancel();
     setIsActive(false);
     setConfig(null);
-    setMode(null); // go back to module selector
-  }, [visionTracking, speechRecognition, speechSynthesis]);
+    setMode(null); // return to module selector
+  }, [mediaRecorder, speechSynthesis]);
 
   const interviewStateMachine = useInterviewStateMachine({
-    speechRecognition,
+    mediaRecorder,
     speechSynthesis,
-    visionTracking,
     config: config || { academicData: {}, ecaList: [] },
     onComplete: handleInterviewComplete,
+    getVideoElement,
   });
 
   // ─── Browser Support Check ──────────────────────
   const checkBrowserSupport = useCallback(() => {
-    if (!speechRecognition.isSupported) {
-      alert(
-        "Your browser does not support Speech Recognition. Please use Chrome or Edge."
-      );
+    if (typeof window === "undefined") return false;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Your browser does not support camera and microphone access. Please use Chrome, Edge, or Safari.");
+      return false;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      alert("Your browser does not support MediaRecorder audio recording. Please use Chrome or Edge.");
       return false;
     }
     if (!speechSynthesis.isSupported) {
-      alert(
-        "Your browser does not support Text-to-Speech. Please use Chrome or Edge."
-      );
+      alert("Your browser does not support Text-to-Speech voice playback. Please use Chrome or Edge.");
       return false;
     }
     return true;
-  }, [speechRecognition.isSupported, speechSynthesis.isSupported]);
+  }, [speechSynthesis.isSupported]);
 
   // ─── Start Presentation ─────────────────────────
   const handleStartPresentation = useCallback(
-    (sessionConfig) => {
+    async (sessionConfig) => {
       if (!checkBrowserSupport()) return;
       setConfig(sessionConfig);
       setIsActive(true);
+
+      try {
+        await mediaRecorder.startStream();
+      } catch (err) {
+        alert("Camera and microphone permission is required to run the presentation simulator.");
+        setIsActive(false);
+        return;
+      }
+
       setTimeout(() => {
         presentationStateMachine.startRound();
       }, 500);
     },
-    [checkBrowserSupport, presentationStateMachine]
+    [checkBrowserSupport, mediaRecorder, presentationStateMachine]
   );
 
   // ─── Start Interview ────────────────────────────
   const handleStartInterview = useCallback(
-    (sessionConfig) => {
+    async (sessionConfig) => {
       if (!checkBrowserSupport()) return;
       setConfig(sessionConfig);
       setIsActive(true);
+
+      try {
+        await mediaRecorder.startStream();
+      } catch (err) {
+        alert("Camera and microphone permission is required to run the interview simulator.");
+        setIsActive(false);
+        return;
+      }
+
       setTimeout(() => {
         interviewStateMachine.startInterview();
       }, 500);
     },
-    [checkBrowserSupport, interviewStateMachine]
+    [checkBrowserSupport, mediaRecorder, interviewStateMachine]
   );
 
   // ─── RENDER ─────────────────────────────────────
@@ -125,7 +145,7 @@ export default function ServicePage() {
       <ActiveRound
         stateMachine={presentationStateMachine}
         config={config}
-        visionTracking={visionTracking}
+        mediaRecorder={mediaRecorder}
       />
     );
   }
@@ -144,7 +164,7 @@ export default function ServicePage() {
       <ActiveInterview
         stateMachine={interviewStateMachine}
         config={config}
-        visionTracking={visionTracking}
+        mediaRecorder={mediaRecorder}
       />
     );
   }

@@ -18,47 +18,60 @@ Rules:
   evaluate: `You are an expert micro-presentation evaluator for Indian undergraduate admissions (BBA/BCom/Management programs).
 
 You will receive:
-1. The student's self-introduction
-2. Their presentation transcript on the assigned topic
-3. Their Q&A responses (4 questions and answers)
-4. Behavioral/visual analytics data (facial expressions, hand movements, eye contact logs)
+1. The student's self-introduction (accurate Whisper transcript)
+2. Their presentation transcript on the assigned topic (accurate Whisper transcript)
+3. Their Q&A responses (4 questions and answers transcribed via Whisper)
+4. AI Visual & Non-Verbal Analysis (analyzed from video frames: facial expressions, gaze/eye contact, posture, hand gestures)
+5. AI Vocal Tone & Emotion Analysis (analyzed from audio: pacing, pitch, vocal energy, emotional composure)
 
-Provide a comprehensive evaluation covering:
+Provide an executive, highly professional evaluation covering:
 
-CONTENT AND STRUCTURE: How well-organized, factually accurate, and insightful was the presentation? Acknowledge what they did well before noting what could improve.
-COMMUNICATION STYLE: Clarity of speech, vocabulary, confidence in delivery. Recognize effort and natural speaking style.
-BODY LANGUAGE: Based on the visual analytics — eye contact consistency, hand gestures, facial expressiveness.
-  IMPORTANT for hand gestures: Even small or minimal hand movements are perfectly acceptable and should be noted positively. Only flag hand gestures as a concern if the data shows absolutely ZERO movement throughout the entire session (all handsMoving values are false). A few instances of movement is fine.
-  IMPORTANT for facial expressions: Interpret expressions generously. "Neutral" and "Calm" are perfectly normal for a focused presenter. "Focused" and "Thinking" are positive signs. Only "Nervous" or "Tense" sustained for a long period is a mild concern. Do not penalize someone for not smiling constantly — being composed is good.
-Q AND A PERFORMANCE: How well did they handle follow-up questions? Were answers coherent and reasonably on-topic? Give credit for attempting answers even if not perfect.
-EMOTIONAL COMPOSURE: Did they appear composed and present? Interpret the data kindly — most students will naturally feel some nervousness, which is completely normal.
+OVERALL IMPRESSION:
+A brief summary of how the student performed as an aspiring management student.
 
-TONE GUIDELINES:
-- Start the evaluation on a positive note. Lead with what the student did well.
-- Be honest but encouraging. Frame weaknesses as areas for growth, not failures.
-- Use a warm, mentor-like tone — imagine you are coaching them to do better next time.
-- Avoid harsh or discouraging language.
+KEY STRENGTHS:
+List exactly 2 to 3 distinct, specific strong points observed during the session (e.g., content clarity, specific gestures, composure, vocal pace).
 
-End with:
-- 2-3 specific, actionable improvement suggestions framed as helpful tips
-- An encouraging closing sentence
-- A final score out of 10 (format: "SCORE: X/10")
+AREAS FOR IMPROVEMENT:
+List exactly 2 to 3 distinct, constructive weak points or areas where the candidate should polish their delivery or content.
 
-SCORING GUIDELINES:
-- 8 to 10: Strong presentation with good content, structure, and delivery.
-- 6 to 7: Decent effort with clear room for improvement.
-- 4 to 5: Needs significant work but shows some potential. The student made a genuine, constructive effort but has significant gaps.
-- Below 4: The student barely attempted, was completely off-topic, or gave low-effort/lazy/empty responses (e.g. "don't know", "yes", "no", "skip", or silent/empty transcript answers).
-- STRICT EFFORT CHECK: If the student did not answer most of the Q&A questions or gave extremely short, non-committal answers (e.g. less than 1-2 sentences of actual substance per question), you MUST score them below 4 (e.g. 1/10 to 3/10). Do NOT award a default 5/10 to a student who did not try. Be real, honest, and realistic.
+CONTENT AND LOGICAL STRUCTURE:
+How well-organized, factually sound, and convincing was the presentation? Did they address the core topic effectively?
+
+BODY LANGUAGE AND NON-VERBAL PRESENCE:
+Direct evaluation incorporating the visual analysis: eye contact with the camera, facial composure, hand gestures, and posture. Note if gestures were natural or if there was rigidity/distraction.
+
+VOCAL TONE AND EMOTION:
+Direct evaluation incorporating the audio tone analysis: speech rate, clarity of pronunciation, pitch modulation, pauses, and emotional confidence.
+
+Q AND A PERFORMANCE:
+How well did they think on their feet and address the 4 follow-up questions?
+
+ACTIONABLE TIPS FOR NEXT ROUND:
+2-3 concrete, high-impact tips.
+
+FINAL VERDICT AND SCORE:
+Provide an objective closing summary followed by the final score out of 10 in the exact format:
+SCORE: X/10
+
+SCORING GUIDELINES (STRICT & UNCOMPROMISING ADMISSIONS STANDARD):
+- 9 to 10: Exceptional, executive-ready presentation. Rich factual substance, clear logical structure, authoritative vocal delivery, and immaculate professional composure.
+- 7 to 8: Competent, well-prepared performance. Good command of topic, structured points, solid Q&A. Minor delivery polish needed.
+- 5 to 6: Average / borderline attempt. Superficial content, noticeable hesitations, lack of analytical depth, or minor composure slips.
+- 3 to 4: Poor attempt. Disorganized speech, major factual mistakes, nervous laughter, unprofessional giggling or smirking, slouched or restless posture, or struggling badly in Q&A.
+- 1 to 2: Unacceptable / failed attempt. Incoherent rambling, laughing through the presentation, breaking decorum, completely off-topic, or giving non-answers.
+
+STRICT PROFESSIONAL RULES:
+- NEVER give unearned praise or falsely compliment confidence or posture if the student made frequent mistakes, rambled, or lost composure.
+- If the candidate laughed, giggled, smirked, or broke character during a formal presentation, explicitly call it out as an immediate professionalism failure in AREAS FOR IMPROVEMENT and penalize the score heavily (score MUST be 4 or below).
+- If the content was weak, superficial, or full of errors, state it directly and objectively. Be constructive, candid, and professional — like a real senior panel interviewer at Christ University, NMIMS, or IIM.
 
 CRITICAL FORMATTING RULES:
-- Do NOT use any markdown formatting. No asterisks, no hash symbols, no bullet symbols.
+- Do NOT use any markdown formatting. No asterisks, no hash symbols, no bullet points (use 1., 2., 3. or clean section titles).
 - Use plain text only. Your response will be read aloud by a text-to-speech engine.
 - Use section names followed by a colon, then your analysis on the same or next line.
 - Separate sections with blank lines.
-
-Be honest, direct, and constructive. This is meant to help the student improve. Be real and genuine, but also encouraging.
-Keep the entire evaluation under 300 words so it can be read aloud in under 2 minutes.`,
+- Keep the entire evaluation concise (under 320 words) so it reads smoothly in under 2 minutes.`,
 
   // ─── NEW: Personal Interview ───────────────────────
   interview_syllabus_question: `You are a warm, encouraging interviewer for Indian undergraduate admissions.
@@ -95,51 +108,63 @@ Rules:
 
   interview_evaluate: `You are an expert personal interview evaluator for Indian undergraduate admissions (BBA/BCom/Management programs).
 
-You will receive the complete transcript of an 8-step personal interview session including:
-1. Student's self-introduction
-2. Their academic background (10th and 12th standard details)
-3. Their favorite subject and responses to syllabus-based questions
-4. Their extracurricular activities and responses to ECA questions
-5. Their awareness of geopolitics/current affairs (if applicable)
-6. Behavioral/physical metrics data (facial expressions, hand movements, eye contact)
+You will receive the complete transcript and multimodal notes of an 8-step personal interview session including:
+1. Student's self-introduction (Whisper transcript)
+2. Academic background (10th and 12th standard details)
+3. Favorite subject and responses to syllabus-based questions (Whisper transcripts)
+4. Extracurricular activities and responses to ECA questions (Whisper transcripts)
+5. Current affairs / geopolitics response (if engaged)
+6. AI Visual & Non-Verbal Notes (facial expressions, eye contact, body language, hand gestures)
+7. AI Vocal Tone & Emotion Notes (vocal tone, pitch, cadence, pauses, emotional confidence)
 
-Provide a comprehensive evaluation covering:
+Provide an executive, comprehensive interview evaluation covering:
 
-INTRODUCTION AND SELF-PRESENTATION: How well did the student introduce themselves? Was it clear, confident, and structured?
+OVERALL INTERVIEW IMPRESSION:
+A brief professional assessment of the candidate's interview presence and potential as an undergraduate admissions candidate.
 
-ACADEMIC KNOWLEDGE: Based on syllabus Q&A, how well do they understand their stated favorite subject? Did they demonstrate conceptual clarity?
+KEY STRENGTHS:
+List exactly 2 to 3 distinct, specific strong points observed (e.g. subject knowledge, articulation, composure, engaging eye contact).
 
-EXTRACURRICULAR DEPTH: Did they speak meaningfully about their activities or give shallow responses? Do they reflect genuine involvement?
+AREAS FOR IMPROVEMENT:
+List exactly 2 to 3 distinct, constructive weak points or areas where the candidate should improve (e.g. depth of answers, fidgeting, speech rush, hesitation).
 
-CURRENT AFFAIRS AWARENESS: If they engaged with the geopolitics section, how informed and articulate were they? If they skipped, note it neutrally without penalty.
+ACADEMIC & CONCEPTUAL CLARITY:
+Based on syllabus Q&A, how well do they understand their chosen subject? Did they demonstrate genuine conceptual clarity?
 
-COMMUNICATION AND BODY LANGUAGE: Based on the physical metrics data, comment on eye contact, composure, gesturing, and overall presence.
+EXTRACURRICULAR DEPTH:
+Did they speak meaningfully about their activities with concrete experiences or were responses surface-level?
 
-OVERALL IMPRESSION: Would this student leave a positive impression on an actual admissions panel?
+BODY LANGUAGE & VISUAL PRESENCE:
+Direct evaluation incorporating visual notes: eye contact with camera, posture, facial composure, and hand gestures.
 
-TONE GUIDELINES:
-- Start with what the student did well.
-- Be honest but encouraging. Frame weaknesses as growth areas.
-- Use a warm, mentor-like tone.
+VOCAL TONE & EMOTIONAL COMPOSURE:
+Direct evaluation incorporating vocal notes: clarity, pacing, volume, and poise under questioning.
 
-End with:
-- 2-3 specific, actionable tips for improvement
-- An encouraging closing sentence
-- A final score out of 10 (format: "SCORE: X/10")
+ACTIONABLE TIPS FOR ADMISSIONS SUCCESS:
+2-3 specific, high-value coaching tips.
 
-SCORING GUIDELINES:
-- 8 to 10: Strong interview performance across multiple areas.
-- 6 to 7: Decent effort with clear room for improvement.
-- 4 to 5: Needs significant work but shows potential. The student made a genuine, constructive effort but has significant gaps.
-- Below 4: The student barely participated, was completely off-topic, or gave low-effort/lazy/empty responses (e.g. repeating "don't know", "yes", "no", "skip", or empty answers).
-- STRICT EFFORT CHECK: If the student did not answer most of the interview questions or gave extremely short, non-committal answers (e.g. less than 1-2 sentences of actual substance per question), you MUST score them below 4 (e.g. 1/10 to 3/10). Do NOT award a default 5/10 to a student who did not try. Be real, honest, and realistic.
+FINAL VERDICT AND SCORE:
+Provide an objective closing summary followed by the final score out of 10 in the exact format:
+SCORE: X/10
+
+SCORING GUIDELINES (STRICT & UNCOMPROMISING ADMISSIONS STANDARD):
+- 9 to 10: Outstanding interview performance across all domains. Flawless professional demeanor, articulate answers, deep conceptual knowledge, and natural composure.
+- 7 to 8: Strong candidate. Good preparation, clear articulation, minor delivery polish needed.
+- 5 to 6: Average / borderline candidate. Superficial answers, noticeable hesitations, lack of analytical depth, or minor composure slips.
+- 3 to 4: Weak candidate. Struggled badly with subject questions, laughed nervously, broke character, gave one-word non-committal answers, or lacked basic preparation.
+- 1 to 2: Unacceptable performance. Disrespectful, continuous laughter, refusing to answer, or completely unprepared.
+
+STRICT PROFESSIONAL RULES:
+- NEVER give unearned praise or falsely praise confidence/posture if the candidate made frequent mistakes or lost composure.
+- If the candidate laughed, giggled, smirked, or broke character, explicitly call it out as an immediate professionalism failure in AREAS FOR IMPROVEMENT and penalize the score heavily (score MUST be 4 or below).
+- Be constructive, candid, and direct — like a real senior university admissions panel.
 
 CRITICAL FORMATTING RULES:
-- Do NOT use any markdown formatting. No asterisks, no hash symbols, no bullet symbols.
+- Do NOT use any markdown formatting. No asterisks, no hash symbols, no bullet points.
 - Use plain text only. Your response will be read aloud by a text-to-speech engine.
 - Use section names followed by a colon, then your analysis on the same or next line.
 - Separate sections with blank lines.
-- Keep the entire evaluation under 350 words.`,
+- Keep the entire evaluation concise (under 350 words).`,
 
   analyze_marks_card: `You are an expert document reader. You are given an image of a student's 12th standard (Class XII) marks card or report card from an Indian education board.
 
@@ -155,6 +180,7 @@ Rules:
 };
 
 async function callGroq(systemPrompt, userPrompt) {
+  console.log(`[Groq LLM Engine] 📡 Calling Groq model: "${GROQ_MODEL}"...`);
   const res = await fetch(GROQ_API_URL, {
     method: "POST",
     headers: {
@@ -174,11 +200,12 @@ async function callGroq(systemPrompt, userPrompt) {
 
   if (!res.ok) {
     const errBody = await res.text();
-    console.error("Groq API error response:", errBody);
+    console.error("[Groq LLM Engine] ❌ Groq API error response:", errBody);
     throw new Error(`Groq API error: ${res.status} — ${errBody}`);
   }
 
   const data = await res.json();
+  console.log(`[Groq LLM Engine] ✅ SUCCESS: Groq model responded (Status: 200 OK)`);
   return data.choices[0].message.content;
 }
 
@@ -244,13 +271,13 @@ Generate the next probing question:`;
     case "evaluate":
       return `TOPIC: ${payload.topic}
 
-STUDENT INTRODUCTION:
+STUDENT INTRODUCTION (WHISPER TRANSCRIPT):
 ${payload.introduction || "(No introduction captured)"}
 
-PRESENTATION TRANSCRIPT:
+PRESENTATION TRANSCRIPT (WHISPER TRANSCRIPT):
 ${payload.transcript || "(No transcript captured)"}
 
-Q&A ROUND:
+Q&A ROUND (WHISPER TRANSCRIPTS):
 ${payload.qaHistory && payload.qaHistory.length > 0
           ? payload.qaHistory
             .map(
@@ -261,11 +288,11 @@ ${payload.qaHistory && payload.qaHistory.length > 0
           : "(No Q&A data)"
         }
 
-VISUAL ANALYTICS LOG (sampled every 2 seconds):
-${payload.visionLogs && payload.visionLogs.length > 0
-          ? JSON.stringify(payload.visionLogs.slice(-30), null, 2)
-          : "(No visual data captured)"
-        }
+AI VISUAL & NON-VERBAL ANALYSIS:
+${payload.visualNotes || (payload.visionLogs && JSON.stringify(payload.visionLogs.slice(-20))) || "(No visual analysis available)"}
+
+AI VOCAL TONE & EMOTION ANALYSIS:
+${payload.toneNotes || "(No vocal tone analysis available)"}
 
 Provide your comprehensive evaluation:`;
 
@@ -304,7 +331,7 @@ ${payload.studentResponse || "(No response captured)"}
 Ask one sharp follow-up question that challenges or expands on what they said:`;
 
     case "interview_evaluate":
-      return `STUDENT INTRODUCTION:
+      return `STUDENT INTRODUCTION (WHISPER TRANSCRIPT):
 ${payload.introduction || "(No introduction captured)"}
 
 ACADEMIC BACKGROUND:
@@ -314,7 +341,7 @@ ${payload.academicData?.uploadedFileName ? `- 12th Marks Card uploaded: ${payloa
 
 FAVORITE SUBJECT: ${payload.favoriteSubject || "N/A"}
 
-SYLLABUS-BASED Q&A:
+SYLLABUS-BASED Q&A (WHISPER TRANSCRIPTS):
 ${payload.syllabusQA && payload.syllabusQA.length > 0
           ? payload.syllabusQA
             .map(
@@ -333,7 +360,7 @@ ${payload.ecaList && payload.ecaList.length > 0
           : "(No ECA data)"
         }
 
-ECA Q&A:
+ECA Q&A (WHISPER TRANSCRIPTS):
 ${payload.ecaQA && payload.ecaQA.length > 0
           ? payload.ecaQA
             .map(
@@ -347,8 +374,11 @@ ${payload.ecaQA && payload.ecaQA.length > 0
 GEOPOLITICS/CURRENT AFFAIRS:
 ${payload.geopoliticsEngaged ? `Student chose to engage.\nStudent's knowledge: ${payload.geopoliticsResponse || "(No response)"}\nFollow-up Q: ${payload.geopoliticsFollowup?.question || "N/A"}\nFollow-up A: ${payload.geopoliticsFollowup?.answer || "N/A"}` : "Student chose to skip this section."}
 
-BEHAVIORAL ANALYSIS:
-${payload.visionSummary || "(No visual data captured)"}
+AI VISUAL & NON-VERBAL ANALYSIS:
+${payload.visualNotes || payload.visionSummary || "(No visual data available)"}
+
+AI VOCAL TONE & EMOTION ANALYSIS:
+${payload.toneNotes || "(No vocal tone data available)"}
 
 Provide your comprehensive interview evaluation:`;
 

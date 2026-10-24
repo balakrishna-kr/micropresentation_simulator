@@ -4,43 +4,35 @@ import { INTERVIEW_STEPS } from "@/lib/interviewConstants";
 import CameraFeed from "@/components/service/CameraFeed";
 import TranscriptBox from "@/components/service/TranscriptBox";
 import InterviewStepIndicator from "./InterviewStepIndicator";
+import AiModelDiagnostics from "@/components/service/AiModelDiagnostics";
 
 export default function ActiveInterview({
   stateMachine,
   config,
-  visionTracking,
+  mediaRecorder,
 }) {
   const cameraRef = useRef(null);
   const {
     step,
     waitingForUser,
     statusMessage,
+    isTranscribing,
+    latestTranscript,
+    aiDiagnostics,
     qaHistory,
     evaluation,
     score,
     currentQALabel,
     confirmResponse,
     abortInterview,
-    transcript,
-    interimText,
   } = stateMachine;
 
-  // Initialize vision tracking when camera is ready
+  // Start stream on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (cameraRef.current) {
-        const videoEl = cameraRef.current.getVideoElement();
-        if (videoEl) {
-          visionTracking.initTracking(videoEl);
-        }
-      }
-    }, 2000);
-
-    return () => {
-      clearTimeout(timer);
-      visionTracking.stopTracking();
-    };
-  }, []);
+    if (mediaRecorder && !mediaRecorder.stream) {
+      mediaRecorder.startStream().catch((e) => console.error("Stream init error:", e));
+    }
+  }, [mediaRecorder]);
 
   const showTranscript =
     step === INTERVIEW_STEPS.INTRODUCTION ||
@@ -52,9 +44,9 @@ export default function ActiveInterview({
   const getTranscriptLabel = () => {
     switch (step) {
       case INTERVIEW_STEPS.INTRODUCTION:
-        return "Your Introduction";
+        return "Self Introduction";
       case INTERVIEW_STEPS.FAVORITE_SUBJECT:
-        return "Your Favorite Subject";
+        return "Favorite Subject";
       case INTERVIEW_STEPS.SYLLABUS_QA:
         return currentQALabel || "Subject Q&A";
       case INTERVIEW_STEPS.ECA_QA:
@@ -62,11 +54,12 @@ export default function ActiveInterview({
       case INTERVIEW_STEPS.GEOPOLITICS:
         return "Current Affairs";
       default:
-        return "Live Transcript";
+        return "Interview Speech";
     }
   };
 
   const getButtonLabel = () => {
+    if (isTranscribing) return "Transcribing with Whisper AI...";
     switch (step) {
       case INTERVIEW_STEPS.INTRODUCTION:
         return "✓ Done Introducing";
@@ -85,10 +78,15 @@ export default function ActiveInterview({
       <div className="max-w-6xl mx-auto w-full mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-lg">🎓</span>
-            <span className="text-sm font-medium text-white">
-              Personal Interview Session
-            </span>
+            <span className="text-xl">🎓</span>
+            <div>
+              <span className="text-sm font-semibold text-white">
+                Personal Interview Session
+              </span>
+              <p className="text-[11px] text-slate-400">
+                Undergraduate Admissions Simulator (Multimodal AI)
+              </p>
+            </div>
           </div>
           <button
             id="abort-interview-btn"
@@ -108,12 +106,24 @@ export default function ActiveInterview({
       {/* Main Content */}
       <div className="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Camera Feed - 2 columns */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 flex flex-col gap-4">
           <CameraFeed
             ref={cameraRef}
             isActive={step !== INTERVIEW_STEPS.IDLE}
-            expression={visionTracking.currentExpression}
+            stream={mediaRecorder?.stream}
+            isRecording={mediaRecorder?.isRecording}
             isWarning={false}
+          />
+
+          {/* AI Model Diagnostics Panel */}
+          <AiModelDiagnostics
+            logs={aiDiagnostics?.logs}
+            visionModel={aiDiagnostics?.visionModel}
+            toneModel={aiDiagnostics?.toneModel}
+            whisperStatus={aiDiagnostics?.whisperStatus}
+            visionStatus={aiDiagnostics?.visionStatus}
+            toneStatus={aiDiagnostics?.toneStatus}
+            evalStatus={aiDiagnostics?.evalStatus}
           />
         </div>
 
@@ -126,22 +136,25 @@ export default function ActiveInterview({
                 className={`w-2 h-2 rounded-full ${
                   waitingForUser
                     ? "bg-amber-400 animate-pulse"
+                    : isTranscribing
+                    ? "bg-amber-400 animate-spin"
                     : "bg-white animate-pulse"
                 }`}
               />
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Status
               </span>
             </div>
             <p className="text-sm text-slate-300">{statusMessage}</p>
           </div>
 
-          {/* Transcript */}
+          {/* Transcript Box */}
           {showTranscript && (
             <TranscriptBox
-              transcript={transcript}
-              interimText={interimText}
+              transcript={latestTranscript}
               label={getTranscriptLabel()}
+              isRecording={mediaRecorder?.isRecording}
+              isTranscribing={isTranscribing}
             />
           )}
 
@@ -149,8 +162,9 @@ export default function ActiveInterview({
           {waitingForUser && (
             <button
               id="interview-continue-btn"
+              disabled={isTranscribing}
               onClick={confirmResponse}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20 animate-fade-in text-sm"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20 animate-fade-in text-sm"
             >
               {getButtonLabel()}
             </button>
@@ -159,18 +173,9 @@ export default function ActiveInterview({
           {/* Repeat hint */}
           {waitingForUser && (
             <div className="text-center">
-              <p className="text-[10px] text-slate-600 italic">
-                💡 Say &quot;repeat&quot; or &quot;can you repeat that?&quot; to
-                hear the question again
+              <p className="text-[11px] text-slate-500 italic">
+                💡 Tip: Say &quot;repeat&quot; or &quot;can you repeat that?&quot; to hear the question again
               </p>
-            </div>
-          )}
-
-          {/* Vision Loading */}
-          {visionTracking.isLoading && (
-            <div className="glass rounded-xl p-3 flex items-center gap-2 text-xs text-slate-400">
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              Loading vision models...
             </div>
           )}
         </div>
@@ -210,16 +215,24 @@ export default function ActiveInterview({
       {/* Evaluation Display */}
       {step === INTERVIEW_STEPS.EVALUATION && evaluation && (
         <div className="max-w-6xl mx-auto w-full mt-6 animate-fade-in-up">
-          <div className="glass-strong rounded-2xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <span>📊</span> Your Interview Evaluation
-              </h3>
+          <div className="glass-strong rounded-2xl p-8 border border-white/10 shadow-2xl">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    Personal Interview Assessment Report
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Comprehensive Multimodal Evaluation (Academics • Communication • Body Language • Tone)
+                  </p>
+                </div>
+              </div>
               {score !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">Score:</span>
+                <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl border border-white/10">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Score:</span>
                   <span
-                    className={`text-3xl font-bold ${
+                    className={`text-3xl font-extrabold ${
                       score >= 7
                         ? "text-emerald-400"
                         : score >= 5
@@ -232,7 +245,7 @@ export default function ActiveInterview({
                 </div>
               )}
             </div>
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-sans">
               {evaluation}
             </div>
           </div>

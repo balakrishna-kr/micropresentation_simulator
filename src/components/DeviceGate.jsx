@@ -1,26 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore, useState, useEffect } from "react";
+
+function subscribe(callback) {
+  window.addEventListener("resize", callback);
+  return () => window.removeEventListener("resize", callback);
+}
+
+function getSnapshot() {
+  return window.innerWidth < 1024;
+}
+
+function getServerSnapshot() {
+  return false;
+}
 
 export default function DeviceGate({ children }) {
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const checkDevice = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-
-    // Run on mount
-    checkDevice();
-
-    window.addEventListener("resize", checkDevice);
-    return () => window.removeEventListener("resize", checkDevice);
+    // defer to avoid synchronous setState warning
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   if (!mounted) {
-    // Hide content before mounting to prevent flash of content on load
     return <div style={{ opacity: 0 }}>{children}</div>;
   }
 

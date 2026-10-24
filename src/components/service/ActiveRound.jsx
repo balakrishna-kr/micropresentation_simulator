@@ -5,8 +5,9 @@ import CameraFeed from "./CameraFeed";
 import Timer from "./Timer";
 import TranscriptBox from "./TranscriptBox";
 import PhaseIndicator from "./PhaseIndicator";
+import AiModelDiagnostics from "./AiModelDiagnostics";
 
-export default function ActiveRound({ stateMachine, config, visionTracking }) {
+export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
   const cameraRef = useRef(null);
   const {
     phase,
@@ -17,29 +18,20 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
     currentQAIndex,
     waitingForUser,
     statusMessage,
+    isTranscribing,
+    latestTranscript,
+    aiDiagnostics,
     confirmIntroduction,
     confirmAnswer,
     abortRound,
-    transcript,
-    interimText,
   } = stateMachine;
 
-  // Initialize vision tracking when camera is ready
+  // Start stream on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (cameraRef.current) {
-        const videoEl = cameraRef.current.getVideoElement();
-        if (videoEl) {
-          visionTracking.initTracking(videoEl);
-        }
-      }
-    }, 2000); // Wait for camera to initialize
-
-    return () => {
-      clearTimeout(timer);
-      visionTracking.stopTracking();
-    };
-  }, []);
+    if (mediaRecorder && !mediaRecorder.stream) {
+      mediaRecorder.startStream().catch((e) => console.error("Stream init error:", e));
+    }
+  }, [mediaRecorder]);
 
   const isTimedPhase =
     phase === PHASES.PREPARATION || phase === PHASES.PRESENTATION;
@@ -53,13 +45,13 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
   const getTranscriptLabel = () => {
     switch (phase) {
       case PHASES.GREETING:
-        return "Your Introduction";
+        return "Self Introduction";
       case PHASES.PRESENTATION:
-        return "Your Presentation";
+        return "Presentation Transcript";
       case PHASES.QA:
-        return `Q&A Answer (${currentQAIndex}/${4})`;
+        return `Q&A Answer (${currentQAIndex}/4)`;
       default:
-        return "Live Transcript";
+        return "Speech Transcript";
     }
   };
 
@@ -70,8 +62,8 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-400">Topic:</span>
-            <span className="text-sm font-medium text-white">
-              {config.topic.emoji} {config.topic.title}
+            <span className="text-sm font-semibold text-white">
+              {config.topic?.emoji || "🎯"} {config.topic?.title}
             </span>
           </div>
           <button
@@ -91,15 +83,27 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Camera Feed - takes 2 columns */}
-        <div className="lg:col-span-2">
+        {/* Camera Feed - 2 columns */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
           <CameraFeed
             ref={cameraRef}
             isActive={phase !== PHASES.IDLE}
-            expression={visionTracking.currentExpression}
+            stream={mediaRecorder?.stream}
+            isRecording={mediaRecorder?.isRecording}
             isWarning={
               phase === PHASES.PRESENTATION && timeRemaining <= 10 && timeRemaining > 0
             }
+          />
+
+          {/* AI Model Diagnostics Panel */}
+          <AiModelDiagnostics
+            logs={aiDiagnostics?.logs}
+            visionModel={aiDiagnostics?.visionModel}
+            toneModel={aiDiagnostics?.toneModel}
+            whisperStatus={aiDiagnostics?.whisperStatus}
+            visionStatus={aiDiagnostics?.visionStatus}
+            toneStatus={aiDiagnostics?.toneStatus}
+            evalStatus={aiDiagnostics?.evalStatus}
           />
         </div>
 
@@ -121,24 +125,29 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
             <div className="flex items-center gap-2 mb-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  waitingForUser ? "bg-amber-400 animate-pulse" : "bg-white animate-pulse"
+                  waitingForUser
+                    ? "bg-amber-400 animate-pulse"
+                    : isTranscribing
+                    ? "bg-amber-400 animate-spin"
+                    : "bg-white animate-pulse"
                 }`}
               />
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Status
               </span>
             </div>
             <p className="text-sm text-slate-300">{statusMessage}</p>
           </div>
 
-          {/* Transcript */}
+          {/* Transcript Box */}
           {(phase === PHASES.GREETING ||
             phase === PHASES.PRESENTATION ||
             phase === PHASES.QA) && (
             <TranscriptBox
-              transcript={transcript}
-              interimText={interimText}
+              transcript={latestTranscript}
               label={getTranscriptLabel()}
+              isRecording={mediaRecorder?.isRecording}
+              isTranscribing={isTranscribing}
             />
           )}
 
@@ -146,25 +155,20 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
           {waitingForUser && (
             <button
               id="continue-btn"
+              disabled={isTranscribing}
               onClick={
                 phase === PHASES.GREETING
                   ? confirmIntroduction
                   : confirmAnswer
               }
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20 animate-fade-in"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20 animate-fade-in text-sm"
             >
-              {phase === PHASES.GREETING
+              {isTranscribing
+                ? "Processing Audio with Whisper..."
+                : phase === PHASES.GREETING
                 ? "✓ Continue — I'm done introducing"
                 : "✓ Submit My Answer"}
             </button>
-          )}
-
-          {/* Vision Loading State */}
-          {visionTracking.isLoading && (
-            <div className="glass rounded-xl p-3 flex items-center gap-2 text-xs text-slate-400">
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              Loading vision models...
-            </div>
           )}
         </div>
       </div>
@@ -203,16 +207,24 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
       {/* Evaluation Display */}
       {phase === PHASES.EVALUATION && evaluation && (
         <div className="max-w-6xl mx-auto w-full mt-6 animate-fade-in-up">
-          <div className="glass-strong rounded-2xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <span>📊</span> Your Evaluation
-              </h3>
+          <div className="glass-strong rounded-2xl p-8 border border-white/10 shadow-2xl">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    Professional Micro-Presentation Evaluation
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Comprehensive Multimodal Report (Content • Body Language • Vocal Tone)
+                  </p>
+                </div>
+              </div>
               {score !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">Score:</span>
+                <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl border border-white/10">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Score:</span>
                   <span
-                    className={`text-3xl font-bold ${
+                    className={`text-3xl font-extrabold ${
                       score >= 7
                         ? "text-emerald-400"
                         : score >= 5
@@ -225,7 +237,7 @@ export default function ActiveRound({ stateMachine, config, visionTracking }) {
                 </div>
               )}
             </div>
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-sans">
               {evaluation}
             </div>
           </div>

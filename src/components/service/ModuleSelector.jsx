@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 export default function ModuleSelector({ onSelectMode }) {
   return (
@@ -117,12 +118,12 @@ export default function ModuleSelector({ onSelectMode }) {
 
         {/* Back to home link */}
         <div className="text-center mt-8">
-          <a
+          <Link
             href="/"
             className="text-xs text-slate-500 hover:text-slate-400 transition-colors"
           >
             ← Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
