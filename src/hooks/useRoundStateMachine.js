@@ -165,47 +165,54 @@ export function useRoundStateMachine({
   const startPreparation = useCallback(async () => {
     if (abortRef.current) return;
     setPhase(PHASES.PREPARATION);
-    setStatusMessage("AI is speaking...");
-    addAiLog(`Preparation phase: assigned topic "${config.topic.title}"`, "info");
-
-    await speechSynthesis.speak(
-      `Thank you. Your topic for today is: ${config.topic.title}. Your preparation time begins now.`
-    );
-
-    if (abortRef.current) return;
+    const topicTitle = config?.topic?.title || "your assigned topic";
     setStatusMessage("Prepare your presentation — organize your thoughts");
+    addAiLog(`Preparation phase: assigned topic "${topicTitle}"`, "info");
 
-    startCountdown(config.prepTime, () => {
+    startCountdown(config.prepTime || 60, () => {
       actionsRef.current.startPresentation?.();
     });
+
+    try {
+      await speechSynthesis.speak(
+        `Thank you. Your topic for today is: ${topicTitle}. Your preparation time begins now.`
+      );
+    } catch (e) {
+      console.warn("Speech playback error:", e);
+    }
   }, [speechSynthesis, config, startCountdown, addAiLog]);
 
   // ─── PHASE 3: PRESENTATION ─────────────────────────
   const startPresentation = useCallback(async () => {
     if (abortRef.current) return;
+    clearTimer();
+    speechSynthesis.cancel();
     setPhase(PHASES.PRESENTATION);
-    setStatusMessage("AI is speaking...");
+    setStatusMessage("Present your topic — recording audio and video");
     setLatestTranscript("");
     addAiLog("Presentation phase started: recording live video & audio", "info");
-
-    await speechSynthesis.speak(
-      "Preparation time is over. Time starts now!"
-    );
-
-    if (abortRef.current) return;
-    setStatusMessage("Present your topic — recording audio and video");
 
     const videoEl = getVideoElement ? getVideoElement() : null;
     if (videoEl && !visionTracking.isReady) {
       visionTracking.initTracking(videoEl);
     }
 
-    await mediaRecorder.startRecording();
+    try {
+      await mediaRecorder.startRecording();
+    } catch (e) {
+      console.error("Recording start error:", e);
+    }
 
-    startCountdown(config.presentTime, () => {
+    startCountdown(config.presentTime || 60, () => {
       actionsRef.current.finishPresentation?.();
     });
-  }, [speechSynthesis, mediaRecorder, config, startCountdown, addAiLog, getVideoElement, visionTracking]);
+
+    try {
+      await speechSynthesis.speak("Preparation time is over. Time starts now!");
+    } catch (e) {
+      console.warn("Speech playback error:", e);
+    }
+  }, [speechSynthesis, mediaRecorder, config, startCountdown, addAiLog, getVideoElement, visionTracking, clearTimer]);
 
   const finishPresentation = useCallback(async () => {
     if (abortRef.current) return;
@@ -245,9 +252,13 @@ export function useRoundStateMachine({
     setQaHistory([]);
     addAiLog("Initiating Q&A Round (4 probing follow-up questions)", "info");
 
-    await speechSynthesis.speak(
-      "Time is up. Thank you. I will now ask you a few questions regarding your presentation."
-    );
+    try {
+      await speechSynthesis.speak(
+        "Time is up. Thank you. I will now ask you a few questions regarding your presentation."
+      );
+    } catch (e) {
+      console.warn("Speech playback error:", e);
+    }
 
     if (abortRef.current) return;
     actionsRef.current.askQuestion?.(0);
@@ -267,8 +278,9 @@ export function useRoundStateMachine({
 
       try {
         addAiLog(`Generating contextual Q&A question ${index + 1} via Groq...`, "info");
+        const topicTitle = config?.topic?.title || "your assigned topic";
         const response = await callGemini("generate_question", {
-          topic: config.topic.title,
+          topic: topicTitle,
           transcript: presentationTranscriptRef.current,
           qaHistory: qaHistoryRef.current,
         });
@@ -277,18 +289,22 @@ export function useRoundStateMachine({
 
         const question = response.text;
         addAiLog(`Question ${index + 1} ready: "${question}"`, "success");
-        setStatusMessage("AI is asking a question...");
-
-        await speechSynthesis.speak(`Question ${index + 1}. ${question}`);
-
-        if (abortRef.current) return;
-
         setStatusMessage(`Answer question ${index + 1} — click Submit My Answer when finished`);
         qaHistoryRef.current.push({ question, answer: "" });
         setQaHistory([...qaHistoryRef.current]);
 
-        await mediaRecorder.startRecording();
+        try {
+          await mediaRecorder.startRecording();
+        } catch (e) {
+          console.warn("Recording start warning:", e);
+        }
         setWaitingForUser(true);
+
+        try {
+          await speechSynthesis.speak(`Question ${index + 1}. ${question}`);
+        } catch (e) {
+          console.warn("Speech playback error:", e);
+        }
       } catch (error) {
         console.error("Error generating question:", error);
         addAiLog(`Question generation error: ${error.message}`, "warn");
@@ -301,6 +317,7 @@ export function useRoundStateMachine({
 
   // User clicks "Submit Answer" during Q&A
   const confirmAnswer = useCallback(async () => {
+    speechSynthesis.cancel();
     setWaitingForUser(false);
     setIsTranscribing(true);
     setStatusMessage("Transcribing answer with Whisper AI...");
@@ -327,7 +344,17 @@ export function useRoundStateMachine({
     if (abortRef.current) return;
     const nextIndex = qaHistoryRef.current.length;
     actionsRef.current.askQuestion?.(nextIndex);
-  }, [mediaRecorder, addAiLog]);
+  }, [mediaRecorder, addAiLog, speechSynthesis]);
+
+  const skipPreparation = useCallback(() => {
+    if (phase !== PHASES.PREPARATION) return;
+    actionsRef.current.startPresentation?.();
+  }, [phase]);
+
+  const finishPresentationEarly = useCallback(() => {
+    if (phase !== PHASES.PRESENTATION) return;
+    actionsRef.current.finishPresentation?.();
+  }, [phase]);
 
   // ─── PHASE 5: EVALUATION ───────────────────────────
   const startEvaluation = useCallback(async () => {
@@ -518,5 +545,7 @@ export function useRoundStateMachine({
     confirmIntroduction,
     confirmAnswer,
     finishPresentation,
+    skipPreparation,
+    finishPresentationEarly,
   };
 }

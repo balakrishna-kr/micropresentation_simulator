@@ -21,9 +21,10 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
-    currentExpression,
     confirmIntroduction,
     confirmAnswer,
+    skipPreparation,
+    finishPresentationEarly,
     abortRound,
   } = stateMachine;
 
@@ -171,6 +172,29 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
                 : phase === PHASES.GREETING
                 ? "✓ Continue — I'm done introducing"
                 : "✓ Submit My Answer"}
+            </button>
+          )}
+
+          {/* Preparation Early Start Button */}
+          {phase === PHASES.PREPARATION && (
+            <button
+              id="skip-prep-btn"
+              onClick={skipPreparation}
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20 text-sm flex items-center justify-center gap-2"
+            >
+              <span>⚡</span> I&apos;m Ready — Start Presentation Now
+            </button>
+          )}
+
+          {/* Presentation Finish Early Button */}
+          {phase === PHASES.PRESENTATION && (
+            <button
+              id="finish-pres-btn"
+              disabled={isTranscribing}
+              onClick={finishPresentationEarly}
+              className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/20 text-sm flex items-center justify-center gap-2"
+            >
+              <span>✓</span> Finish Presentation &amp; Proceed to Q&amp;A
             </button>
           )}
         </div>

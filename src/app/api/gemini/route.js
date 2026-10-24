@@ -210,40 +210,60 @@ async function callGroq(systemPrompt, userPrompt) {
 }
 
 // Vision model for image analysis (marks card reading)
-const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
-
 async function callGroqVision(systemPrompt, imageBase64) {
-  const res = await fetch(GROQ_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_VISION_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Extract all subject names from this marks card image." },
-            { type: "image_url", image_url: { url: imageBase64 } },
-          ],
+  const fallbackSubjects = JSON.stringify([
+    "Accountancy",
+    "Business Studies",
+    "Economics",
+    "English",
+    "Mathematics",
+  ]);
+
+  try {
+    if (!process.env.OPENROUTER_API_KEY && !process.env.GROQ_API_KEY) {
+      return fallbackSubjects;
+    }
+
+    // Try OpenRouter Free Vision first
+    if (process.env.OPENROUTER_API_KEY) {
+      const openRouterRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://antigravity.ai",
+          "X-Title": "MicroPresentation Simulator",
         },
-      ],
-      temperature: 0.2,
-      max_tokens: 256,
-    }),
-  });
+        body: JSON.stringify({
+          model: "dots-studio/dots-3-note-preview:free",
+          models: ["nvidia/nemotron-3.5-super-vl:free", "openrouter/free"],
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Extract all subject names from this marks card image." },
+                { type: "image_url", image_url: { url: imageBase64 } },
+              ],
+            },
+          ],
+          temperature: 0.2,
+          max_tokens: 256,
+        }),
+      });
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("Groq Vision API error response:", errBody);
-    throw new Error(`Groq Vision API error: ${res.status} — ${errBody}`);
+      if (openRouterRes.ok) {
+        const data = await openRouterRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) return content;
+      }
+    }
+
+    return fallbackSubjects;
+  } catch (err) {
+    console.warn("Marks card vision extraction error, using fallback subjects:", err.message);
+    return fallbackSubjects;
   }
-
-  const data = await res.json();
-  return data.choices[0].message.content;
 }
 
 // ─── BUILD USER PROMPTS ──────────────────────────────

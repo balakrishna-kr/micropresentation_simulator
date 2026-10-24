@@ -172,11 +172,11 @@ export function useInterviewStateMachine({
     actionsRef.current.startDataReview?.();
   }, [recordAndTranscribe, detectRepeatIntent, aiSpeak, mediaRecorder, addAiLog, speechSynthesis]);
 
-  // ─── STEP 2: DATA REVIEW (auto-advance) ────────
+  // ─── STEP 2: DATA REVIEW (auto-advance with skip button) ────────
   const startDataReview = useCallback(async () => {
     if (abortRef.current) return;
     setStep(INTERVIEW_STEPS.DATA_REVIEW);
-    setStatusMessage("AI is reviewing your academic data...");
+    setStatusMessage("Reviewing academic records — click Continue to Questions anytime");
     addAiLog("Reviewing academic records & uploaded profile details", "info");
 
     const academicData = config.academicData || {};
@@ -187,14 +187,16 @@ export function useInterviewStateMachine({
     const hasUpload = academicData.uploadedFileName;
     const hasImage = academicData.marksCardBase64;
 
+    // Make Continue button available immediately so candidate is never stuck
+    setWaitingForUser(true);
+
     if (hasImage) {
-      setStatusMessage("AI is reading your marks card...");
       addAiLog("Analyzing marks card document via Groq Vision...", "info");
       try {
         const result = await callGemini("analyze_marks_card", {
           imageBase64: hasImage,
         });
-        if (result.subjects && result.subjects.length > 0) {
+        if (result?.subjects && result.subjects.length > 0) {
           const languageSubjects = ["english", "hindi", "kannada", "urdu", "sanskrit", "tamil", "telugu", "malayalam", "bengali", "marathi", "gujarati"];
           const coreSubjects = result.subjects.filter(
             (s) => !languageSubjects.includes(s.toLowerCase())
@@ -212,28 +214,35 @@ export function useInterviewStateMachine({
     let reviewText = `Thank you for that introduction. I have reviewed your academic profile. You completed your 10th standard from ${board10} with ${marks10} percent, and your 12th standard from ${board12} with ${marks12} percent.`;
 
     if (hasUpload && marksCardSubjectsRef.current.length > 0) {
-      reviewText += ` I have also analyzed your uploaded marks card and noted the subjects: ${marksCardSubjectsRef.current.join(", ")}.`;
-    } else if (hasUpload) {
-      reviewText += ` I have also noted your uploaded 12th marks card for reference.`;
+      reviewText += ` I have also noted the subjects: ${marksCardSubjectsRef.current.join(", ")}.`;
     }
 
     reviewText += ` Let us proceed to the next part of the interview.`;
 
-    await aiSpeak(reviewText);
+    try {
+      await aiSpeak(reviewText);
+    } catch (err) {
+      console.warn("Speech playback error:", err);
+    }
 
     if (abortRef.current) return;
     actionsRef.current.startInstructions?.();
   }, [aiSpeak, config, addAiLog]);
 
-  // ─── STEP 3: INSTRUCTIONS (auto-advance) ──────
+  // ─── STEP 3: INSTRUCTIONS (auto-advance with skip button) ──────
   const startInstructions = useCallback(async () => {
     if (abortRef.current) return;
     setStep(INTERVIEW_STEPS.INSTRUCTIONS);
-    setStatusMessage("AI is giving instructions...");
+    setStatusMessage("Instructions — click Continue to Questions anytime");
+    setWaitingForUser(true);
 
-    await aiSpeak(
-      "I will now ask you a series of contextual questions. Please answer them clearly and take your time. There is no rush."
-    );
+    try {
+      await aiSpeak(
+        "I will now ask you a series of contextual questions. Please answer them clearly and take your time. There is no rush."
+      );
+    } catch (err) {
+      console.warn("Speech playback error:", err);
+    }
 
     if (abortRef.current) return;
     actionsRef.current.startFavoriteSubject?.();
@@ -243,7 +252,7 @@ export function useInterviewStateMachine({
   const startFavoriteSubject = useCallback(async () => {
     if (abortRef.current) return;
     setStep(INTERVIEW_STEPS.FAVORITE_SUBJECT);
-    setStatusMessage("AI is asking a question...");
+    setStatusMessage("Name your favorite subject — click Submit Subject when finished");
     setLatestTranscript("");
 
     const detectedSubjects = marksCardSubjectsRef.current;
@@ -255,12 +264,18 @@ export function useInterviewStateMachine({
       prompt = "Now, what is your favorite subject from your 12th standard? Just tell me the subject name. Or if you want, I can pick one for you.";
     }
 
-    await aiSpeak(prompt);
-
-    if (abortRef.current) return;
-    setStatusMessage("Name your favorite subject — click Submit Subject when finished");
-    await mediaRecorder.startRecording();
+    try {
+      await mediaRecorder.startRecording();
+    } catch (e) {
+      console.error("Recording start error:", e);
+    }
     setWaitingForUser(true);
+
+    try {
+      await aiSpeak(prompt);
+    } catch (err) {
+      console.warn("Speech playback error:", err);
+    }
   }, [aiSpeak, mediaRecorder]);
 
   const confirmFavoriteSubject = useCallback(async () => {
@@ -377,10 +392,6 @@ export function useInterviewStateMachine({
 
       const question = response.text;
       addAiLog(`Question ${index + 1} ready: "${question}"`, "success");
-      setStatusMessage("AI is asking a question...");
-      await aiSpeak(`Question ${index + 1}. ${question}`);
-
-      if (abortRef.current) return;
 
       syllabusQARef.current.push({ question, answer: "" });
       setQaHistory([...syllabusQARef.current, ...ecaQARef.current]);
@@ -389,6 +400,12 @@ export function useInterviewStateMachine({
       await mediaRecorder.startRecording();
       setWaitingForUser(true);
       currentStepHandlerRef.current = "syllabus";
+
+      try {
+        await aiSpeak(`Question ${index + 1}. ${question}`);
+      } catch (e) {
+        console.warn("Speech playback error:", e);
+      }
     } catch (error) {
       console.error("Error generating syllabus question:", error);
       subStepIndexRef.current++;
@@ -468,11 +485,6 @@ export function useInterviewStateMachine({
       if (abortRef.current) return;
 
       const question = response.text;
-      setStatusMessage("AI is asking a question...");
-      await aiSpeak(question);
-
-      if (abortRef.current) return;
-
       ecaQARef.current.push({ question, answer: "" });
       setQaHistory([...syllabusQARef.current, ...ecaQARef.current]);
       setStatusMessage("Answer the question — click Submit Answer when finished");
@@ -480,6 +492,12 @@ export function useInterviewStateMachine({
       await mediaRecorder.startRecording();
       setWaitingForUser(true);
       currentStepHandlerRef.current = "eca";
+
+      try {
+        await aiSpeak(question);
+      } catch (e) {
+        console.warn("Speech playback error:", e);
+      }
     } catch (error) {
       console.error("Error generating ECA question:", error);
       subStepIndexRef.current++;
@@ -511,19 +529,24 @@ export function useInterviewStateMachine({
   const startGeopolitics = useCallback(async () => {
     if (abortRef.current) return;
     setStep(INTERVIEW_STEPS.GEOPOLITICS);
-    setStatusMessage("AI is asking about current affairs...");
+    setStatusMessage("Say Yes or No — click Submit Response when finished");
     setLatestTranscript("");
 
-    await aiSpeak(
-      "Now, are you aware of any recent current affairs or geopolitics events? If you follow the news, feel free to share. Otherwise, just say no and we will move on."
-    );
-
-    if (abortRef.current) return;
-    setStatusMessage("Say Yes or No — click Submit Response when finished");
-
-    await mediaRecorder.startRecording();
+    try {
+      await mediaRecorder.startRecording();
+    } catch (e) {
+      console.error("Recording start error:", e);
+    }
     setWaitingForUser(true);
     currentStepHandlerRef.current = "geopolitics_yesno";
+
+    try {
+      await aiSpeak(
+        "Now, are you aware of any recent current affairs or geopolitics events? If you follow the news, feel free to share. Otherwise, just say no and we will move on."
+      );
+    } catch (e) {
+      console.warn("Speech playback error:", e);
+    }
   }, [aiSpeak, mediaRecorder]);
 
   const confirmGeopoliticsYesNo = useCallback(async () => {
@@ -780,11 +803,18 @@ export function useInterviewStateMachine({
 
   // ─── UNIFIED CONFIRM HANDLER ──────────────────
   const confirmResponse = useCallback(async () => {
+    speechSynthesis.cancel();
     const handler = currentStepHandlerRef.current;
     const currentStep = stepRef.current;
 
     if (currentStep === INTERVIEW_STEPS.INTRODUCTION) {
       confirmIntroduction();
+    } else if (
+      currentStep === INTERVIEW_STEPS.DATA_REVIEW ||
+      currentStep === INTERVIEW_STEPS.INSTRUCTIONS
+    ) {
+      setWaitingForUser(false);
+      actionsRef.current.startFavoriteSubject?.();
     } else if (currentStep === INTERVIEW_STEPS.FAVORITE_SUBJECT) {
       confirmFavoriteSubject();
     } else if (handler === "syllabus") {
@@ -806,6 +836,7 @@ export function useInterviewStateMachine({
     confirmGeopoliticsYesNo,
     confirmGeopoliticsExplanation,
     confirmGeopoliticsFollowup,
+    speechSynthesis,
   ]);
 
   // ─── START / ABORT ────────────────────────────

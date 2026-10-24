@@ -64,6 +64,9 @@ export default function ActiveInterview({
     switch (step) {
       case INTERVIEW_STEPS.INTRODUCTION:
         return "✓ Done Introducing";
+      case INTERVIEW_STEPS.DATA_REVIEW:
+      case INTERVIEW_STEPS.INSTRUCTIONS:
+        return "✓ Continue to Questions";
       case INTERVIEW_STEPS.FAVORITE_SUBJECT:
         return "✓ Submit Subject";
       case INTERVIEW_STEPS.GEOPOLITICS:
