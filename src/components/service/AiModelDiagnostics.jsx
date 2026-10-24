@@ -13,6 +13,7 @@ export default function AiModelDiagnostics({
   visionStatus = "CONNECTED",
   toneStatus = "CONNECTED",
   evalStatus = "CONNECTED",
+  mediaPipeStatus = "CONNECTED",
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -30,6 +31,13 @@ export default function AiModelDiagnostics({
       model: visionModel || "dots-studio:free",
       status: visionStatus,
       icon: "👁️",
+    },
+    {
+      name: "Google MediaPipe",
+      provider: "On-Device",
+      model: "FaceLandmarker-WASM",
+      status: mediaPipeStatus,
+      icon: "⚡",
     },
     {
       name: "Vocal Tone & Emotion AI",
@@ -61,7 +69,7 @@ export default function AiModelDiagnostics({
             AI Engine Connectivity & Diagnostics
           </span>
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
-            4/4 Active
+            5/5 Active
           </span>
         </div>
         <div className="flex items-center gap-2 text-slate-400">

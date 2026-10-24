@@ -291,6 +291,14 @@ ${payload.qaHistory && payload.qaHistory.length > 0
 AI VISUAL & NON-VERBAL ANALYSIS:
 ${payload.visualNotes || (payload.visionLogs && JSON.stringify(payload.visionLogs.slice(-20))) || "(No visual analysis available)"}
 
+PHYSICAL BIOMETRIC TELEMETRY (GOOGLE MEDIAPIPE ON-DEVICE):
+${payload.telemetry ? `
+- Eye Contact Ratio: ${payload.telemetry.eyeContactPercent}% (${payload.telemetry.frequentLookingAway ? "⚠️ Frequent looking away or reading from notes detected" : "✅ Steady camera eye contact maintained"})
+- Dominant Facial Composure: ${payload.telemetry.dominantExpression}
+- Body & Hand Movement Rate: ${payload.telemetry.handsMovingPercent}% of presentation
+- Sample Points Captured: ${payload.telemetry.sampleCount} real-time frames
+` : "(No on-device biometric telemetry available)"}
+
 AI VOCAL TONE & EMOTION ANALYSIS:
 ${payload.toneNotes || "(No vocal tone analysis available)"}
 
@@ -376,6 +384,14 @@ ${payload.geopoliticsEngaged ? `Student chose to engage.\nStudent's knowledge: $
 
 AI VISUAL & NON-VERBAL ANALYSIS:
 ${payload.visualNotes || payload.visionSummary || "(No visual data available)"}
+
+PHYSICAL BIOMETRIC TELEMETRY (GOOGLE MEDIAPIPE ON-DEVICE):
+${payload.telemetry ? `
+- Eye Contact Ratio: ${payload.telemetry.eyeContactPercent}% (${payload.telemetry.frequentLookingAway ? "⚠️ Frequent looking away or reading from notes detected" : "✅ Steady camera eye contact maintained"})
+- Dominant Facial Composure: ${payload.telemetry.dominantExpression}
+- Body & Hand Movement Rate: ${payload.telemetry.handsMovingPercent}% of interview
+- Sample Points Captured: ${payload.telemetry.sampleCount} real-time frames
+` : "(No on-device biometric telemetry available)"}
 
 AI VOCAL TONE & EMOTION ANALYSIS:
 ${payload.toneNotes || "(No vocal tone data available)"}

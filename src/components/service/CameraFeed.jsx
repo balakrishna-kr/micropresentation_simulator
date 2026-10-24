@@ -2,7 +2,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
 const CameraFeed = forwardRef(function CameraFeed(
-  { isActive, stream, isWarning, isRecording },
+  { isActive, stream, isWarning, isRecording, currentExpression },
   ref
 ) {
   const videoRef = useRef(null);
@@ -92,6 +92,15 @@ const CameraFeed = forwardRef(function CameraFeed(
           <span className="text-[11px] text-red-400 font-semibold tracking-wide uppercase">
             {isRecording ? "REC" : "LIVE"}
           </span>
+        </div>
+      )}
+
+      {/* MediaPipe Real-Time Facial/Posture Feedback */}
+      {isActive && currentExpression && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/85 border border-white/15 backdrop-blur-md text-xs shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          <span className="text-slate-400 font-medium">Expression:</span>
+          <span className="font-semibold text-white">{currentExpression}</span>
         </div>
       )}
 

@@ -3,10 +3,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { PHASES, QA_QUESTION_COUNT } from "@/lib/constants";
 import { callGemini } from "@/lib/gemini";
 import { transcribeAudio, analyzeVisual, analyzeTone } from "@/lib/apiHelpers";
+import { useVisionTracking } from "./useVisionTracking";
 
 /**
  * Central orchestrator implementing the 5-phase micro-presentation flow.
- * Powered by Groq Whisper, OpenRouter Vision AI, and OpenRouter Audio AI.
+ * Powered by Groq Whisper, OpenRouter Vision AI, Google MediaPipe, and OpenRouter Audio AI.
  */
 export function useRoundStateMachine({
   mediaRecorder,
@@ -15,6 +16,8 @@ export function useRoundStateMachine({
   onComplete,
   getVideoElement,
 }) {
+  const visionTracking = useVisionTracking();
+
   const [phase, setPhase] = useState(PHASES.IDLE);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [qaHistory, setQaHistory] = useState([]);
@@ -30,6 +33,7 @@ export function useRoundStateMachine({
   const [aiDiagnostics, setAiDiagnostics] = useState({
     logs: [
       { time: new Date().toLocaleTimeString(), message: "Groq Whisper Large v3 connected and ready", type: "success" },
+      { time: new Date().toLocaleTimeString(), message: "Google MediaPipe on-device FaceLandmarker ready (WASM)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "OpenRouter Vision AI ready (dots-studio / nemotron-omni)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "OpenRouter Tone & Emotion AI ready (cohere / dots-studio)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "Groq Executive Evaluator ready (openai/gpt-oss-120b)", type: "success" },
@@ -38,6 +42,7 @@ export function useRoundStateMachine({
     toneModel: "cohere/north-mini-code:free",
     whisperStatus: "CONNECTED",
     visionStatus: "CONNECTED",
+    mediaPipeStatus: "CONNECTED",
     toneStatus: "CONNECTED",
     evalStatus: "CONNECTED",
   });
@@ -111,12 +116,14 @@ export function useRoundStateMachine({
     const videoEl = getVideoElement ? getVideoElement() : null;
     if (videoEl) {
       mediaRecorder.startPeriodicFrameCapture(videoEl, 3000);
+      visionTracking.initTracking(videoEl);
+      addAiLog("Google MediaPipe on-device FaceLandmarker tracking active", "success");
       addAiLog("Webcam video frame capture activated (480p sampling)", "info");
     }
     await mediaRecorder.startRecording();
     addAiLog("MediaRecorder started: capturing audio stream", "info");
     setWaitingForUser(true);
-  }, [speechSynthesis, mediaRecorder, getVideoElement, addAiLog]);
+  }, [speechSynthesis, mediaRecorder, getVideoElement, addAiLog, visionTracking]);
 
   // User clicks "Continue" after introduction
   const confirmIntroduction = useCallback(async () => {
@@ -179,12 +186,17 @@ export function useRoundStateMachine({
     if (abortRef.current) return;
     setStatusMessage("Present your topic — recording audio and video");
 
+    const videoEl = getVideoElement ? getVideoElement() : null;
+    if (videoEl && !visionTracking.isReady) {
+      visionTracking.initTracking(videoEl);
+    }
+
     await mediaRecorder.startRecording();
 
     startCountdown(config.presentTime, () => {
       actionsRef.current.finishPresentation?.();
     });
-  }, [speechSynthesis, mediaRecorder, config, startCountdown, addAiLog]);
+  }, [speechSynthesis, mediaRecorder, config, startCountdown, addAiLog, getVideoElement, visionTracking]);
 
   const finishPresentation = useCallback(async () => {
     if (abortRef.current) return;
@@ -323,6 +335,15 @@ export function useRoundStateMachine({
     addAiLog("Connecting to OpenRouter Vision & Vocal Tone models...", "info");
 
     mediaRecorder.stopPeriodicFrameCapture();
+    visionTracking.stopTracking();
+
+    const telemetry = visionTracking.getTelemetrySummary();
+    if (telemetry) {
+      addAiLog(
+        `MediaPipe Telemetry: ${telemetry.eyeContactPercent}% eye contact, composure: ${telemetry.dominantExpression}`,
+        "success"
+      );
+    }
 
     try {
       const capturedFrames = mediaRecorder.getCapturedFrames();
@@ -352,6 +373,7 @@ export function useRoundStateMachine({
         toneModel: toneResult.modelUsed || prev.toneModel,
         visionStatus: "CONNECTED",
         toneStatus: "CONNECTED",
+        mediaPipeStatus: "CONNECTED",
       }));
 
       if (abortRef.current) return;
@@ -365,6 +387,7 @@ export function useRoundStateMachine({
         qaHistory: qaHistoryRef.current,
         visualNotes: visualResult.visualNotes,
         toneNotes: toneResult.toneNotes,
+        telemetry,
       });
 
       if (abortRef.current) return;
@@ -395,7 +418,7 @@ export function useRoundStateMachine({
         if (onComplete) onComplete();
       }, 5000);
     }
-  }, [speechSynthesis, mediaRecorder, config, onComplete, addAiLog]);
+  }, [speechSynthesis, mediaRecorder, config, onComplete, addAiLog, visionTracking]);
 
   // Synchronize actionsRef
   useEffect(() => {
@@ -437,15 +460,18 @@ export function useRoundStateMachine({
     presentationAudioBlobRef.current = null;
     qaHistoryRef.current = [];
     mediaRecorder.clearCapturedFrames();
+    visionTracking.clearLog();
 
     await startGreeting();
-  }, [startGreeting, mediaRecorder]);
+  }, [startGreeting, mediaRecorder, visionTracking]);
 
   // ─── ABORT THE ROUND ───────────────────────────────
   const abortRound = useCallback(() => {
     abortRef.current = true;
     clearTimer();
     mediaRecorder.stopPeriodicFrameCapture();
+    visionTracking.stopTracking();
+    visionTracking.clearLog();
     mediaRecorder.stopRecording();
     speechSynthesis.cancel();
     setPhase(PHASES.IDLE);
@@ -453,15 +479,16 @@ export function useRoundStateMachine({
     setIsTranscribing(false);
     setStatusMessage("");
     addAiLog("Session aborted by candidate", "warn");
-  }, [clearTimer, mediaRecorder, speechSynthesis, addAiLog]);
+  }, [clearTimer, mediaRecorder, speechSynthesis, addAiLog, visionTracking]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       abortRef.current = true;
       clearTimer();
+      visionTracking.stopTracking();
     };
-  }, [clearTimer]);
+  }, [clearTimer, visionTracking]);
 
   return {
     phase,
@@ -475,6 +502,8 @@ export function useRoundStateMachine({
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
+    currentExpression: visionTracking.currentExpression,
+    getTelemetrySummary: visionTracking.getTelemetrySummary,
     startRound,
     abortRound,
     confirmIntroduction,

@@ -19,6 +19,7 @@ export default function ActiveInterview({
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
+    currentExpression,
     qaHistory,
     evaluation,
     score,
@@ -112,6 +113,7 @@ export default function ActiveInterview({
             isActive={step !== INTERVIEW_STEPS.IDLE}
             stream={mediaRecorder?.stream}
             isRecording={mediaRecorder?.isRecording}
+            currentExpression={currentExpression}
             isWarning={false}
           />
 
@@ -124,6 +126,7 @@ export default function ActiveInterview({
             visionStatus={aiDiagnostics?.visionStatus}
             toneStatus={aiDiagnostics?.toneStatus}
             evalStatus={aiDiagnostics?.evalStatus}
+            mediaPipeStatus={aiDiagnostics?.mediaPipeStatus}
           />
         </div>
 

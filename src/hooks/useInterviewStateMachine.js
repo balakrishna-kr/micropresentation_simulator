@@ -8,10 +8,11 @@ import {
 } from "@/lib/interviewConstants";
 import { callGemini } from "@/lib/gemini";
 import { transcribeAudio, analyzeVisual, analyzeTone } from "@/lib/apiHelpers";
+import { useVisionTracking } from "./useVisionTracking";
 
 /**
  * 8-step Personal Interview state machine with voice loop.
- * Upgraded to use MediaRecorder, Groq Whisper transcription, OpenRouter Vision AI, and OpenRouter Tone AI.
+ * Upgraded to use MediaRecorder, Groq Whisper transcription, OpenRouter Vision AI, Google MediaPipe, and OpenRouter Tone AI.
  */
 export function useInterviewStateMachine({
   mediaRecorder,
@@ -20,6 +21,8 @@ export function useInterviewStateMachine({
   onComplete,
   getVideoElement,
 }) {
+  const visionTracking = useVisionTracking();
+
   const [step, setStep] = useState(INTERVIEW_STEPS.IDLE);
   const [waitingForUser, setWaitingForUser] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -34,6 +37,7 @@ export function useInterviewStateMachine({
   const [aiDiagnostics, setAiDiagnostics] = useState({
     logs: [
       { time: new Date().toLocaleTimeString(), message: "Groq Whisper Large v3 connected and ready", type: "success" },
+      { time: new Date().toLocaleTimeString(), message: "Google MediaPipe on-device FaceLandmarker ready (WASM)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "OpenRouter Vision AI ready (dots-studio / nemotron-omni)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "OpenRouter Tone & Emotion AI ready (cohere / dots-studio)", type: "success" },
       { time: new Date().toLocaleTimeString(), message: "Groq Executive Evaluator ready (openai/gpt-oss-120b)", type: "success" },
@@ -42,6 +46,7 @@ export function useInterviewStateMachine({
     toneModel: "cohere/north-mini-code:free",
     whisperStatus: "CONNECTED",
     visionStatus: "CONNECTED",
+    mediaPipeStatus: "CONNECTED",
     toneStatus: "CONNECTED",
     evalStatus: "CONNECTED",
   });
@@ -134,11 +139,13 @@ export function useInterviewStateMachine({
     const videoEl = getVideoElement ? getVideoElement() : null;
     if (videoEl) {
       mediaRecorder.startPeriodicFrameCapture(videoEl, 3000);
+      visionTracking.initTracking(videoEl);
+      addAiLog("Google MediaPipe on-device FaceLandmarker tracking active", "success");
       addAiLog("Webcam video frame capture activated (480p sampling)", "info");
     }
     await mediaRecorder.startRecording();
     setWaitingForUser(true);
-  }, [aiSpeak, mediaRecorder, getVideoElement, addAiLog]);
+  }, [aiSpeak, mediaRecorder, getVideoElement, addAiLog, visionTracking]);
 
   const confirmIntroduction = useCallback(async () => {
     setWaitingForUser(false);
@@ -639,6 +646,15 @@ export function useInterviewStateMachine({
     addAiLog("Connecting to OpenRouter Vision and Vocal Tone AI engines...", "info");
 
     mediaRecorder.stopPeriodicFrameCapture();
+    visionTracking.stopTracking();
+
+    const telemetry = visionTracking.getTelemetrySummary();
+    if (telemetry) {
+      addAiLog(
+        `MediaPipe Telemetry: ${telemetry.eyeContactPercent}% eye contact, composure: ${telemetry.dominantExpression}`,
+        "success"
+      );
+    }
 
     try {
       const capturedFrames = mediaRecorder.getCapturedFrames();
@@ -662,6 +678,7 @@ export function useInterviewStateMachine({
         toneModel: toneResult.modelUsed || prev.toneModel,
         visionStatus: "CONNECTED",
         toneStatus: "CONNECTED",
+        mediaPipeStatus: "CONNECTED",
       }));
 
       if (abortRef.current) return;
@@ -680,6 +697,7 @@ export function useInterviewStateMachine({
         geopoliticsFollowup: geopoliticsFollowupRef.current,
         visualNotes: visualResult.visualNotes,
         toneNotes: toneResult.toneNotes,
+        telemetry,
       });
 
       if (abortRef.current) return;
@@ -710,7 +728,7 @@ export function useInterviewStateMachine({
         if (onComplete) onComplete();
       }, 5000);
     }
-  }, [aiSpeak, mediaRecorder, config, onComplete, addAiLog]);
+  }, [aiSpeak, mediaRecorder, config, onComplete, addAiLog, visionTracking]);
 
   // Synchronize actionsRef
   useEffect(() => {
@@ -802,13 +820,16 @@ export function useInterviewStateMachine({
     subStepIndexRef.current = 0;
     currentStepHandlerRef.current = null;
     mediaRecorder.clearCapturedFrames();
+    visionTracking.clearLog();
 
     await startIntroduction();
-  }, [startIntroduction, mediaRecorder]);
+  }, [startIntroduction, mediaRecorder, visionTracking]);
 
   const abortInterview = useCallback(() => {
     abortRef.current = true;
     mediaRecorder.stopPeriodicFrameCapture();
+    visionTracking.stopTracking();
+    visionTracking.clearLog();
     mediaRecorder.stopRecording();
     speechSynthesis.cancel();
     setStep(INTERVIEW_STEPS.IDLE);
@@ -816,13 +837,14 @@ export function useInterviewStateMachine({
     setIsTranscribing(false);
     setStatusMessage("");
     addAiLog("Interview aborted by candidate", "warn");
-  }, [mediaRecorder, speechSynthesis, addAiLog]);
+  }, [mediaRecorder, speechSynthesis, addAiLog, visionTracking]);
 
   useEffect(() => {
     return () => {
       abortRef.current = true;
+      visionTracking.stopTracking();
     };
-  }, []);
+  }, [visionTracking]);
 
   return {
     step,
@@ -831,6 +853,8 @@ export function useInterviewStateMachine({
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
+    currentExpression: visionTracking.currentExpression,
+    getTelemetrySummary: visionTracking.getTelemetrySummary,
     qaHistory,
     evaluation,
     score,

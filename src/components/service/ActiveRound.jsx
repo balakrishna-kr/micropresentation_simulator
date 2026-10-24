@@ -21,6 +21,7 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
     isTranscribing,
     latestTranscript,
     aiDiagnostics,
+    currentExpression,
     confirmIntroduction,
     confirmAnswer,
     abortRound,
@@ -90,6 +91,7 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
             isActive={phase !== PHASES.IDLE}
             stream={mediaRecorder?.stream}
             isRecording={mediaRecorder?.isRecording}
+            currentExpression={currentExpression}
             isWarning={
               phase === PHASES.PRESENTATION && timeRemaining <= 10 && timeRemaining > 0
             }
@@ -104,6 +106,7 @@ export default function ActiveRound({ stateMachine, config, mediaRecorder }) {
             visionStatus={aiDiagnostics?.visionStatus}
             toneStatus={aiDiagnostics?.toneStatus}
             evalStatus={aiDiagnostics?.evalStatus}
+            mediaPipeStatus={aiDiagnostics?.mediaPipeStatus}
           />
         </div>
 
